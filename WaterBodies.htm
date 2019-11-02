@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8' />
+    <title>Add a GeoJSON polygon</title>
+    <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+    <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v1.4.0/mapbox-gl.js'></script>
+    <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v1.4.0/mapbox-gl.css' rel='stylesheet' />
+    <style>
+        body { margin:0; padding:0; }
+        #map { position:absolute; top:0; bottom:0; width:100%; }
+    </style>
+</head>
+<body>
+
+<div id='map'></div>
+<script>
+mapboxgl.accessToken = 'pk.eyJ1IjoiZ2swMyIsImEiOiJhMzEwZTIyYWRhZWFjNWE5MTg0MzVkOGU5MjUyNzkxMiJ9.MKrbn4sDFM-oNMc9QupIKg';
+var map = new mapboxgl.Map({
+    container: 'map',
+    style: 'mapbox://styles/mapbox/streets-v11',
+    center: [80.3231944444444, 13.2233888888889],
+    zoom: 10
+});
+
+map.on('load', function () {
+    map.addSource("national-park", {
+      "type": "geojson",
+      'data': 'http://127.0.0.1:8000/source_chennai_water2.geojson'
+    });
+    map.addLayer({
+      "id": "park-boundary",
+      "type": "fill",
+      "source": "national-park",
+      "paint": {
+      "fill-color": "#000",
+      "fill-opacity": 0.8
+      },
+      "filter": ["==", "$type", "Polygon"]
+    });
+});
+</script>
+
+</body>
+</html>

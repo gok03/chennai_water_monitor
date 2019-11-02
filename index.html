@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8' />
+    <title>Chennai Water Monitor</title>
+    <link rel="icon" type="image/png" href="https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/whatsapp/224/water-wave_1f30a.png">
+    <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+    <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v1.3.2/mapbox-gl.js'></script>
+    <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v1.3.2/mapbox-gl.css' rel='stylesheet' />
+    <link href='sidebar_styles.css' rel='stylesheet' />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/4.10.0/d3.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="chart_data.js"></script>
+    <style>
+        body { margin:0; padding:0; }
+        #map { position:absolute; top:0; bottom:0; width:100%; }
+    </style>
+</head>
+<body>
+<main>  
+    <div class="page-content">  
+        <div id='map'></div>
+
+        <div class='map-overlay'>
+            <fieldset>
+                <input id='feature-filter' type='text' placeholder='Filter results by name' />
+            </fieldset>
+            <div id='feature-listing' class='listing'></div>
+        </div>
+    </div>
+    <footer>
+        <div class="sliding--menu__wrapper slide--bottom">
+            <input type="checkbox" id="navigation" />        
+            <label id="hamburger--icon" for="navigation" style="display: none;">
+                <span class="icon-menu"></span>
+            </label>      
+        
+            <nav style="">
+                <ul style="padding-bottom: 10px;padding-top: 10px">
+                    <li class="underline-on-hover" style="cursor: pointer; padding-left: 5px" onclick="document.getElementById('hamburger--icon').click();">CLOSE</li>  
+                        <div id="parent">
+                          <div id="left">
+                         <div><center><h5 id="headr"></h5></center></div> 
+                            <div id="chart" style="padding-top: 10px; padding-bottom: 20px"></div>
+                            <div style="width: 112px; height: 20px; border-bottom: 2px solid #333; position: absolute;">Water Level</div>
+                            <div style="margin-left: 200px; width: 112px; height: 20px; border-bottom: 2px solid #5edfff; position: absolute;">RainFall</div>
+                        </div>
+                          <div id="right" style="display: flex; align-items: center; justify-content: center;"><img id="image_area" src="all_images.gif" style="height: 400px;max-width: 400px"></div> 
+                      </div>   
+                </ul>
+            </nav>
+            
+            <div class="obfuscator">
+            </div>        
+        </div>                      
+    </footer> 
+ </main> 
+<script>
+mapboxgl.accessToken = 'pk.eyJ1IjoiZ2swMyIsImEiOiJhMzEwZTIyYWRhZWFjNWE5MTg0MzVkOGU5MjUyNzkxMiJ9.MKrbn4sDFM-oNMc9QupIKg';
+var map = new mapboxgl.Map({
+    container: 'map',
+    style: 'mapbox://styles/mapbox/dark-v10',
+    center: [80.3, 13.05],
+    // maxZoom: 5,
+    // minZoom: 1,
+    zoom: 10
+});
+
+// Holds visible airport features for filtering
+var water_points_details = [];
+
+// Create a popup, but don't add it to the map yet.
+var popup = new mapboxgl.Popup({
+    closeButton: false
+});
+
+var filterEl = document.getElementById('feature-filter');
+var listingEl = document.getElementById('feature-listing');
+var first = true;
+var selected_loc_id = 0;
+
+function start_sidebar() {
+    setTimeout(function () {
+            filterEl.parentNode.style.display = 'block';
+            var features = map.queryRenderedFeatures({layers: ['water_points']});
+            var uniqueFeatures = getUniqueFeatures(features, "S_No_");
+            water_points_details = uniqueFeatures;
+            first = false;
+            renderListings(uniqueFeatures);
+    }, 500);
+}
+
+var chart;
+function renderListings(features) {
+    //console.log(features.length)
+    // Clear any existing listings
+    listingEl.innerHTML = '';
+    if (features.length) {
+        first = false;
+        features.forEach(function(feature) {
+            var prop = feature.properties;
+            var item = document.createElement('a');
+            // item.href = prop.wikipedia;
+            // item.target = '_blank';
+            item.textContent = prop.Name + ' (' + prop.Area__in_acres_ + ' acres)';
+            item.addEventListener('mouseover', function() {
+                // Highlight corresponding feature on the map
+                popup.setLngLat(feature.geometry.coordinates)
+                    .setText(feature.properties.Name + ' (' + feature.properties.Area__in_acres_ + ' acres)')
+                    .addTo(map);
+            });
+            item.addEventListener('click', function() {
+                document.getElementById("image_area").src = "all_images.gif";
+                document.getElementById('hamburger--icon').click();
+                //console.log(global_data["features"][feature.properties.id]["properties"]["date_range"]);
+                //console.log(global_data["features"][feature.properties.id]["properties"]["date_range"]);
+                // [{date:new Date('2013-01-01'),n:120,n3:200},{date:new Date('2013-01-01'),n:120,n3:200}]
+                data = []
+                var idx = parseInt(prop.S_No_);
+                document.getElementById("headr").textContent = feature.properties.Name + ' (' + feature.properties.Area__in_acres_ + ' acres)';
+                //var image_link = "https://chennai-water-data.s3.ap-south-1.amazonaws.com/data/"+idx+"0/images/"+encodeURIComponent(global_data["features"][idx]["properties"]["date_range"][0])+".png";
+                var image_link = "https://chennai-water-data.s3.ap-south-1.amazonaws.com/data/"+idx+"/images/all_images.gif";
+                document.getElementById("image_area").src = image_link;
+                for(var i=0;i<(global_data["features"][idx]["properties"]["date_range"]).length;i++){
+                    date_selected = (global_data["features"][idx]["properties"]["date_range"][i]).split(",")
+                    level_selected = global_data["features"][idx]["properties"]["water_level"][i]
+                    //console.log(date_selected,level_selected)
+                    data.push({date:new Date(date_selected[0]+"-"+date_selected[1]+"-"+date_selected[2]), water_level: level_selected[0]});
+                }
+                var csv_data = []
+                d3.csv("CSV/"+global_data["features"][idx]["properties"]["Zone"]+".csv", function(data1) {
+                    csv_data =  data1;
+                    //console.log(csv_data)
+                    csv_to_chart = [];
+                    max_rainfall = 0;
+                    for(var i in csv_data){
+                        csv_to_chart.push({date:new Date(csv_data[i]["Date"]), Rainfall: parseFloat(csv_data[i]["Rainfall"])})
+                        if(max_rainfall < parseFloat(csv_data[i]["Rainfall"])){max_rainfall = parseFloat(csv_data[i]["Rainfall"])}
+                    }   
+                    for(var i in csv_to_chart){
+                        csv_to_chart[i]["Rainfall"] = csv_to_chart[i]["Rainfall"]/max_rainfall;
+                    }
+                    //console.log(csv_to_chart);
+                    chart = d3_timeseries()
+                                  .addSerie(data,{x:'date',y:'water_level'},{interpolate:'monotone',color:"#333"})
+                                  .addSerie(csv_to_chart,{x:'date',y:'Rainfall'},{interpolate:'monotone',color:"#5edfff"})
+                                  .width(700)
+                                  .height(300)
+                                  // .on("click", function(d,i){
+                                  //       if (d) { console.log(d)}
+                                  //   });
+                    document.getElementById("chart").innerHTML = '';
+                    chart('#chart')
+                    document.querySelector("#chart > svg").style.height = 250;
+                });
+            });
+            listingEl.appendChild(item);
+        });
+
+        // Show the filter input
+        filterEl.parentNode.style.display = 'block';
+    } else if (first == true){
+        start_sidebar()
+    } 
+    else {
+        filterEl.parentNode.style.display = 'block';
+        first = false;
+        var empty = document.createElement('p');
+        empty.textContent = 'No Matching Water Body Found';
+        listingEl.appendChild(empty);
+
+        // Hide the filter input
+        //filterEl.parentNode.style.display = 'none';
+
+        // remove features filter
+        map.setFilter('water_points', ['has', 'S_No_']);
+    }
+}
+function normalize(string) {
+    return string.trim().toLowerCase();
+}
+
+function getUniqueFeatures(array, comparatorProperty) {
+    var existingFeatureKeys = {};
+    // Because features come from tiled vector data, feature geometries may be split
+    // or duplicated across tile boundaries and, as a result, features may appear
+    // multiple times in query results.
+    var uniqueFeatures = array.filter(function(el) {
+        if (existingFeatureKeys[el.properties[comparatorProperty]]) {
+            return false;
+        } else {
+            existingFeatureKeys[el.properties[comparatorProperty]] = true;
+            return true;
+        }
+    });
+
+    return uniqueFeatures;
+}
+
+map.on('load', function() {
+
+    map.addSource("polygon_source", {
+      "type": "geojson",
+      'data': 'data.geojson'
+    });
+    map.addLayer({
+      "id": "water_polygons",
+      "type": "fill",
+      "source": "polygon_source",
+      "paint": {
+      "fill-color": "#42b883",
+      "fill-opacity": 0.8
+      },
+      "filter": ["==", "$type", "Polygon"]
+    });
+
+
+    map.addSource("point_source", {
+      "type": "geojson",
+      'data': 'points.geojson'
+    });
+    map.addLayer({
+        "id": "water_points",
+        "source": "point_source",
+        "type": "symbol",
+        "layout": {
+            "icon-image": "marker-15",
+            "icon-padding": 0,
+            "icon-allow-overlap": true
+        }
+    });
+
+    map.addSource("chennai_outline_source", {
+      "type": "geojson",
+      'data': 'chennai_outline.geojson'
+    });
+    map.addLayer({
+      "id": "chennai_outline",
+      "type": "fill",
+      "source": "chennai_outline_source",
+      "paint": {
+      "fill-color": "#fff",
+      "fill-opacity": 0.2
+      },
+      "filter": ["==", "$type", "Polygon"]
+    });
+
+    map.on('moveend', function() {
+        var features = map.queryRenderedFeatures({layers: ['water_points']});
+
+        if (features) {
+            var uniqueFeatures = getUniqueFeatures(features, "S_No_");
+            // Populate features for the listing overlay.
+            renderListings(uniqueFeatures);
+
+            // Clear the input container
+            filterEl.value = '';
+
+            // Store the current features in sn `airports` variable to
+            // later use for filtering on `keyup`.
+            water_points_details = uniqueFeatures;
+        }
+    });
+
+    map.on('mousemove', 'water_points', function(e) {
+        // Change the cursor style as a UI indicator.
+        map.getCanvas().style.cursor = 'pointer';
+
+        // Populate the popup and set its coordinates based on the feature.
+        var feature = e.features[0];
+        popup.setLngLat(feature.geometry.coordinates)
+            .setText(feature.properties.Name + ' (' + feature.properties.Area__in_acres_ + ' acres)')
+            .addTo(map);
+    });
+
+    map.on('mouseleave', 'water_points', function() {
+        map.getCanvas().style.cursor = '';
+        popup.remove();
+    });
+
+    filterEl.addEventListener('keyup', function(e) {
+        var value = normalize(e.target.value);
+
+        // Filter visible features that don't match the input value.
+        var filtered = water_points_details.filter(function(feature) {
+            var name = normalize(feature.properties.Name);
+            var code = normalize(feature.properties.Area__in_acres_);
+            return name.indexOf(value) > -1 || code.indexOf(value) > -1;
+        });
+
+        // Populate the sidebar with filtered results
+        renderListings(filtered);
+
+        // Set the filter to populate features into the layer.
+        map.setFilter('water_points', ['match', ['get', 'S_No_'], filtered.map(function(feature) {
+            return feature.properties.Area__in_acres_;
+        }), true, false]);
+    });
+    renderListings([]);
+});
+var global_data = 0;
+d3.json("data_only_available.geojson", function(data) {
+    global_data =  data;
+});
+
+</script>
+
+</body>
+</html>
